@@ -34,6 +34,7 @@
 		 */
 		const GOLDSOURCE = 0;
 		const SOURCE     = 1;
+		const SQUAD      = 2;
 		
 		/**
 		 * Packets sent
@@ -70,7 +71,7 @@
 		/**
 		 * Points to rcon class
 		 * 
-		 * @var SourceRcon|GoldSourceRcon|null
+		 * @var SourceRcon|GoldSourceRcon|SquadRcon|null
 		 */
 		private $Rcon;
 		
@@ -512,6 +513,12 @@
 				case SourceQuery::SOURCE:
 				{
 					$this->Rcon = new SourceRcon( $this->Socket );
+					
+					break;
+				}
+				case SourceQuery::SQUAD:
+				{
+					$this->Rcon = new SquadRcon( $this->Socket );
 					
 					break;
 				}
