@@ -84,7 +84,7 @@
 			return $Length === FWrite( $this->RconSocket, $Command, $Length );
 		}
 		
-		public function Read( ) : Buffer
+		public function Read( ) : ?Buffer
 		{
 			$Buffer = new Buffer( );
 			$Buffer->Set( FRead( $this->RconSocket, 4 ) );
@@ -94,6 +94,8 @@
 				if (!$this->IsMulti)
 				{
 					throw new InvalidPacketException( 'Rcon read: Failed to read any data from socket', InvalidPacketException::BUFFER_EMPTY );
+				} else {
+					return null;
 				}
 			}
 
@@ -202,7 +204,7 @@
 			
 			// We do this stupid hack to handle split packets
 			// See https://developer.valvesoftware.com/wiki/Source_RCON_Protocol#Multiple-packet_Responses
-			if( StrLen( $Data ) >= 4000 )
+			if( mb_strlen( $Data ) >= 4000 )
 			{
 				$this->IsMulti = true;
 
@@ -211,6 +213,10 @@
 				do
 				{	
 					$Buffer = $this->Read( );
+
+					if (!$Buffer) {
+						break;
+					}
 					
 					$Buffer->GetLong( ); // RequestID
 					
@@ -228,7 +234,7 @@
 					
 					$Data .= $Data2;
 
-					if(StrLen( $Data2 ) < 4000)
+					if(mb_strlen( $Data2 ) < 4000)
 					{
 						break;
 					}
