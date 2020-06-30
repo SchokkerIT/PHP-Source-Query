@@ -1,7 +1,7 @@
 {
-	"name": "xpaw/php-source-query-class",
-	"description": "PHP library to query and send RCON commands to servers based on \"Source Engine Query\" protocol",
-	"homepage": "https://github.com/xPaw/PHP-Source-Query",
+	"name": "dsg/php-source-query-class",
+	"description": "xPaw's SourceQuery adjusted for Squad",
+	"homepage": "https://github.com/Deutsche-Squad-Gemeinschaft/PHP-Source-Query",
 	"type": "library",
 	"license": "LGPL-2.1",
 	"keywords":
