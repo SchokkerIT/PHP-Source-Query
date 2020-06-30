@@ -12,6 +12,7 @@
 
 	namespace xPaw\SourceQuery;
 
+	use xPaw\SourceQuery\Exception\AuthenticationException;
 	use xPaw\SourceQuery\Exception\InvalidArgumentException;
 	use xPaw\SourceQuery\Exception\InvalidPacketException;
 	use xPaw\SourceQuery\Exception\SocketException;
@@ -21,6 +22,7 @@
 	 *
 	 * @package xPaw\SourceQuery
 	 *
+	 * @uses xPaw\SourceQuery\Exception\AuthenticationException
 	 * @uses xPaw\SourceQuery\Exception\InvalidArgumentException
 	 * @uses xPaw\SourceQuery\Exception\InvalidPacketException
 	 * @uses xPaw\SourceQuery\Exception\SocketException
@@ -68,37 +70,29 @@
 		/**
 		 * Points to rcon class
 		 * 
-		 * @var SourceRcon
+		 * @var SourceRcon|GoldSourceRcon|null
 		 */
 		private $Rcon;
 		
 		/**
 		 * Points to socket class
-		 * 
-		 * @var Socket
 		 */
-		private $Socket;
+		private BaseSocket $Socket;
 		
 		/**
 		 * True if connection is open, false if not
-		 * 
-		 * @var bool
 		 */
-		private $Connected;
+		private bool $Connected = false;
 		
 		/**
 		 * Contains challenge
-		 * 
-		 * @var string
 		 */
-		private $Challenge;
+		private string $Challenge = '';
 		
 		/**
 		 * Use old method for getting challenge number
-		 * 
-		 * @var bool
 		 */
-		private $UseOldGetChallengeMethod;
+		private bool $UseOldGetChallengeMethod = false;
 		
 		public function __construct( BaseSocket $Socket = null )
 		{
@@ -121,16 +115,16 @@
 		 * @throws InvalidArgumentException
 		 * @throws SocketException
 		 */
-		public function Connect( $Address, $Port, $Timeout = 3, $Engine = self::SOURCE )
+		public function Connect( string $Address, int $Port, int $Timeout = 3, int $Engine = self::SOURCE ) : void
 		{
 			$this->Disconnect( );
 			
-			if( !is_int( $Timeout ) || $Timeout < 0 )
+			if( $Timeout < 0 )
 			{
-				throw new InvalidArgumentException( 'Timeout must be an integer.', InvalidArgumentException::TIMEOUT_NOT_INTEGER );
+				throw new InvalidArgumentException( 'Timeout must be a positive integer.', InvalidArgumentException::TIMEOUT_NOT_INTEGER );
 			}
 			
-			$this->Socket->Open( $Address, (int)$Port, $Timeout, (int)$Engine );
+			$this->Socket->Open( $Address, $Port, $Timeout, $Engine );
 			
 			$this->Connected = true;
 		}
@@ -142,7 +136,7 @@
 		 *
 		 * @returns bool Previous value
 		 */
-		public function SetUseOldGetChallengeMethod( $Value )
+		public function SetUseOldGetChallengeMethod( bool $Value ) : bool
 		{
 			$Previous = $this->UseOldGetChallengeMethod;
 			
@@ -154,10 +148,10 @@
 		/**
 		 * Closes all open connections
 		 */
-		public function Disconnect( )
+		public function Disconnect( ) : void
 		{
 			$this->Connected = false;
-			$this->Challenge = 0;
+			$this->Challenge = '';
 			
 			$this->Socket->Close( );
 			
@@ -178,7 +172,7 @@
 		 *
 		 * @return bool True on success, false on failure
 		 */
-		public function Ping( )
+		public function Ping( ) : bool
 		{
 			if( !$this->Connected )
 			{
@@ -199,7 +193,7 @@
 		 *
 		 * @return array Returns an array with information on success
 		 */
-		public function GetInfo( )
+		public function GetInfo( ) : array
 		{
 			if( !$this->Connected )
 			{
@@ -210,6 +204,7 @@
 			$Buffer = $this->Socket->Read( );
 			
 			$Type = $Buffer->GetByte( );
+			$Server = [];
 			
 			// Old GoldSource protocol, HLTV still uses it
 			if( $Type === self::S2A_INFO_OLD && $this->Socket->Engine === self::GOLDSOURCE )
@@ -235,6 +230,7 @@
 				
 				if( $Server[ 'IsMod' ] )
 				{
+					$Mod = [];
 					$Mod[ 'Url' ]        = $Buffer->GetString( );
 					$Mod[ 'Download' ]   = $Buffer->GetString( );
 					$Buffer->Get( 1 ); // NULL byte
@@ -242,15 +238,11 @@
 					$Mod[ 'Size' ]       = $Buffer->GetLong( );
 					$Mod[ 'ServerSide' ] = $Buffer->GetByte( ) === 1;
 					$Mod[ 'CustomDLL' ]  = $Buffer->GetByte( ) === 1;
+					$Server[ 'Mod' ] = $Mod;
 				}
 				
 				$Server[ 'Secure' ]   = $Buffer->GetByte( ) === 1;
 				$Server[ 'Bots' ]     = $Buffer->GetByte( );
-				
-				if( isset( $Mod ) )
-				{
-					$Server[ 'Mod' ] = $Mod;
-				}
 				
 				return $Server;
 			}
@@ -289,13 +281,13 @@
 			{
 				$Server[ 'ExtraDataFlags' ] = $Flags = $Buffer->GetByte( );
 				
-				// The server's game port
+				// S2A_EXTRA_DATA_HAS_GAME_PORT - Next 2 bytes include the game port.
 				if( $Flags & 0x80 )
 				{
 					$Server[ 'GamePort' ] = $Buffer->GetShort( );
 				}
 				
-				// The server's steamid
+				// S2A_EXTRA_DATA_HAS_STEAMID - Next 8 bytes are the steamID
 				// Want to play around with this?
 				// You can use https://github.com/xPaw/SteamID.php
 				if( $Flags & 0x10 )
@@ -327,20 +319,20 @@
 					unset( $SteamIDLower, $SteamIDInstance, $SteamID );
 				}
 				
-				// The spectator port and then the spectator server name
+				// S2A_EXTRA_DATA_HAS_SPECTATOR_DATA - Next 2 bytes include the spectator port, then the spectator server name.
 				if( $Flags & 0x40 )
 				{
 					$Server[ 'SpecPort' ] = $Buffer->GetShort( );
 					$Server[ 'SpecName' ] = $Buffer->GetString( );
 				}
 				
-				// The game tag data string for the server
+				// S2A_EXTRA_DATA_HAS_GAMETAG_DATA - Next bytes are the game tag string
 				if( $Flags & 0x20 )
 				{
 					$Server[ 'GameTags' ] = $Buffer->GetString( );
 				}
 				
-				// GameID -- alternative to AppID?
+				// S2A_EXTRA_DATA_GAMEID - Next 8 bytes are the gameID of the server
 				if( $Flags & 0x01 )
 				{
 					$Server[ 'GameID' ] = $Buffer->GetUnsignedLong( ) | ( $Buffer->GetUnsignedLong( ) << 32 ); 
@@ -364,7 +356,7 @@
 		 * 
 		 * @return array Returns an array with players on success
 		 */
-		public function GetPlayers( )
+		public function GetPlayers( ) : array
 		{
 			if( !$this->Connected )
 			{
@@ -389,6 +381,7 @@
 			
 			while( $Count-- > 0 && $Buffer->Remaining( ) > 0 )
 			{
+				$Player = [];
 				$Player[ 'Id' ]    = $Buffer->GetByte( ); // PlayerID, is it just always 0?
 				$Player[ 'Name' ]  = $Buffer->GetString( );
 				$Player[ 'Frags' ] = $Buffer->GetLong( );
@@ -409,7 +402,7 @@
 		 *
 		 * @return array Returns an array with rules on success
 		 */
-		public function GetRules( )
+		public function GetRules( ) : array
 		{
 			if( !$this->Connected )
 			{
@@ -448,12 +441,9 @@
 		/**
 		 * Get challenge (used for players/rules packets)
 		 *
-		 * @param $Header
-		 * @param $ExpectedResult
-		 *
 		 * @throws InvalidPacketException
 		 */
-		private function GetChallenge( $Header, $ExpectedResult )
+		private function GetChallenge( int $Header, int $ExpectedResult ) : void
 		{
 			if( $this->Challenge )
 			{
@@ -504,7 +494,7 @@
 		 * @throws InvalidPacketException
 		 * @throws SocketException
 		 */
-		public function SetRconPassword( $Password )
+		public function SetRconPassword( string $Password ) : void
 		{
 			if( !$this->Connected )
 			{
@@ -525,6 +515,10 @@
 					
 					break;
 				}
+				default:
+				{
+					throw new SocketException( 'Unknown engine.', SocketException::INVALID_ENGINE );
+				}
 			}
 			
 			$this->Rcon->Open( );
@@ -542,7 +536,7 @@
 		 *
 		 * @return string Answer from server in string
 		 */
-		public function Rcon( $Command )
+		public function Rcon( string $Command ) : string
 		{
 			if( !$this->Connected )
 			{
