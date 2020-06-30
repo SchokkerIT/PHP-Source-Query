@@ -91,11 +91,9 @@
 			
 			if( $Buffer->Remaining( ) < 4 )
 			{
-				if ($this->IsMulti)
+				if (!$this->IsMulti)
 				{
 					throw new InvalidPacketException( 'Rcon read: Failed to read any data from socket', InvalidPacketException::BUFFER_EMPTY );
-				} else {
-					return '';
 				}
 			}
 
