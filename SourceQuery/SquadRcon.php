@@ -104,7 +104,7 @@
 			$PacketSize = $Buffer->GetLong( );
 			$PacketData = FRead( $this->RconSocket, $PacketSize );
 
-			if ($this->CalledCommand === 'listplayers' || substr( $this->CalledCommand, 0, 8 ) === 'AdminBan' || substr( $this->Command_called, 0, 9 ) === 'AdminKick')
+			if ($this->CalledCommand === 'listplayers' || substr( $this->CalledCommand, 0, 8 ) === 'adminban' || substr( $this->Command_called, 0, 9 ) === 'adminkick')
 			{
 				if ( (strlen(rtrim(substr($PacketData, 8), '\0'))) > (strlen(str_replace('\0','',substr($PacketData, 8)))) )
 				{
@@ -181,7 +181,7 @@
 		
 		public function Command( string $Command ) : string
 		{
-			$this->CalledCommand = $Command;
+			$this->CalledCommand = strtolower($Command);
 			$this->IsMulti = false;
 
 			$this->Write( SourceQuery::SERVERDATA_EXECCOMMAND, $Command );
