@@ -6,7 +6,7 @@ This is a fork of xPaw's PHP Source Query class to be compatible to [Squad](http
 ## Special Thanks
 
 * [ToG] subtlerod (Adjusting the SourceRcon implementation)
-* [Thomas Smyth](https://github.com/Thomas-Smyth/SquadJS) (Creator of SquadJS which is a great resource for Squad RCON).
+* [Thomas Smyth](https://github.com/Thomas-Smyth/SquadJS) (Creator of SquadJS, a great resource for Squad RCON).
 
 ## License
     PHP Source Query
