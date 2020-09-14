@@ -16,6 +16,7 @@
 		"ark",
 		"gmod"
 	],
+	"version": "1.2.0",
 	"require":
 	{
 		"php": ">=7.3",
